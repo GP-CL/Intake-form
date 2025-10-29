@@ -2157,7 +2157,7 @@ const PatientIntakeForm: React.FC = () => {
           )}
           {currentPage === 8 && (
             <div className="space-y-6">
-              <h2 className="text-xl font-semibold"> DetObservation Chart</h2>
+              <h2 className="text-xl font-semibold"> Observation Chart</h2>
 
               <table className="w-full border border-gray-300">
                 <thead>
