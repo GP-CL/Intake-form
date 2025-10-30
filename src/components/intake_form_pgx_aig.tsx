@@ -53,7 +53,7 @@ function MedicationAutocomplete({ value, onChange, placeholder }) {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `${API_BASE_URL}/search_medications?query=${encodeURIComponent(query)}&limit=15`,
+        `${API_BASE_URL}/search_medications/${encodeURIComponent(query)}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
