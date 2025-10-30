@@ -1,25 +1,88 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, FileText, Search } from 'lucide-react';
 import AIG_Navbar from './navbar_aig';
 import axios from 'axios';
+
 const API_BASE_URL = "https://di5esbfx1i.execute-api.ap-south-1.amazonaws.com/api";
 
+// Types
+interface Medication {
+  id: number;
+  name: string;
+  dose: string;
+  frequency: string;
+}
+
+interface FormData {
+  patient_name: string;
+  date: string;
+  date_of_birth: string;
+  gender: string;
+  guardian_name: string;
+  age: string;
+  allergies: string;
+  username: string;
+  phone_number: string;
+  email: string;
+  address: string;
+}
+
+interface MedicationSuggestion {
+  Brand: string;
+  Generic: string;
+}
+
+interface SearchCache {
+  [key: string]: MedicationSuggestion[];
+}
+
 // Smart caching to avoid repeated API calls
-const searchCache = {};
+const searchCache: SearchCache = {};
+
+// Store brand-to-generic mapping in localStorage
+const saveBrandGenericMapping = (brand: string, generic: string) => {
+  try {
+    const existingMapping = localStorage.getItem('brandGenericMapping');
+    const mapping = existingMapping ? JSON.parse(existingMapping) : {};
+    mapping[brand] = generic;
+    localStorage.setItem('brandGenericMapping', JSON.stringify(mapping));
+  } catch (error) {
+    console.error('Error saving brand-generic mapping:', error);
+  }
+};
+
+// Get generic name from localStorage
+const getGenericFromBrand = (brand: string): string | null => {
+  try {
+    const existingMapping = localStorage.getItem('brandGenericMapping');
+    if (existingMapping) {
+      const mapping = JSON.parse(existingMapping);
+      return mapping[brand] || null;
+    }
+  } catch (error) {
+    console.error('Error reading brand-generic mapping:', error);
+  }
+  return null;
+};
 
 // Medication Input with Debounced Search + Caching
-function MedicationAutocomplete({ value, onChange, placeholder }) {
-  const [suggestions, setSuggestions] = useState([]);
+interface MedicationAutocompleteProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}
+
+function MedicationAutocomplete({ value, onChange, placeholder }: MedicationAutocompleteProps) {
+  const [suggestions, setSuggestions] = useState<MedicationSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
-  const wrapperRef = useRef(null);
-  const abortControllerRef = useRef(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Close suggestions when clicking outside
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
       }
     }
@@ -28,8 +91,8 @@ function MedicationAutocomplete({ value, onChange, placeholder }) {
   }, []);
 
   // Fetch suggestions from API with caching
-  const fetchSuggestions = async (query) => {
-    if (!query || query.length < 3) { // Wait for at least 3 characters
+  const fetchSuggestions = async (query: string) => {
+    if (!query || query.length < 3) {
       setSuggestions([]);
       return;
     }
@@ -58,18 +121,26 @@ function MedicationAutocomplete({ value, onChange, placeholder }) {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
+          signal: abortControllerRef.current.signal,
         }
       );
-      console.log(response)
+      
       if (response.ok) {
         const data = await response.json();
-        const meds = data.medications || [];
+        const meds: MedicationSuggestion[] = data.medications || [];
+        
+        // Save brand-generic mappings to localStorage
+        meds.forEach(med => {
+          if (med.Brand && med.Generic) {
+            saveBrandGenericMapping(med.Brand, med.Generic);
+          }
+        });
         
         // Cache the results
         searchCache[normalizedQuery] = meds;
         setSuggestions(meds);
       }
-    } catch (error) {
+    } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error('Error fetching medication suggestions:', error);
       }
@@ -82,19 +153,19 @@ function MedicationAutocomplete({ value, onChange, placeholder }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchSuggestions(value);
-    }, 500); // Increased to 500ms to reduce API calls
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [value]);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     onChange(newValue);
     setShowSuggestions(true);
   };
 
-  const handleSuggestionClick = (suggestion) => {
-    onChange(suggestion.name);
+  const handleSuggestionClick = (suggestion: MedicationSuggestion) => {
+    onChange(suggestion.Brand);
     setShowSuggestions(false);
   };
 
@@ -116,29 +187,20 @@ function MedicationAutocomplete({ value, onChange, placeholder }) {
         )}
       </div>
       
-      {showSuggestions && value.length >= 3 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-          {suggestions.length > 0 ? (
-            suggestions.map((suggestion, index) => (
-              <div
-                key={index}
-                onClick={() => handleSuggestionClick(suggestion)}
-                className="px-4 py-2 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-              >
-                <div className="font-medium text-gray-800">{suggestion.name}</div>
-                {suggestion.generic_name && (
-                  <div className="text-xs text-gray-500">Generic: {suggestion.generic_name}</div>
-                )}
-                {suggestion.category && (
-                  <div className="text-xs text-gray-400">{suggestion.category}</div>
-                )}
-              </div>
-            ))
-          ) : !loading && (
-            <div className="px-4 py-3 text-sm text-gray-500 text-center">
-              {value.length < 3 ? 'Type at least 3 characters...' : 'No medications found'}
+      {showSuggestions && value.length >= 3 && suggestions.length > 0 && (
+        <div className="absolute z-50 w-full bottom-full mb-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          {suggestions.map((suggestion, index) => (
+            <div
+              key={index}
+              onClick={() => handleSuggestionClick(suggestion)}
+              className="px-4 py-2 hover:bg-indigo-50 cursor-pointer border-b border-gray-100 last:border-b-0 text-left"
+            >
+              <div className="font-semibold text-gray-900">{suggestion.Brand}</div>
+              {suggestion.Generic && (
+                <div className="text-xs text-gray-600 mt-0.5">Generic: {suggestion.Generic}</div>
+              )}
             </div>
-          )}
+          ))}
         </div>
       )}
     </div>
@@ -146,7 +208,7 @@ function MedicationAutocomplete({ value, onChange, placeholder }) {
 }
 
 export default function AIGPGxIntakeForm() {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     patient_name: '',
     date: new Date().toISOString().split('T')[0],
     date_of_birth: '',
@@ -155,19 +217,19 @@ export default function AIGPGxIntakeForm() {
     age: '',
     allergies: 'None',
     username: '',
-    phone_number:'',
-    email:'',
-    address:''
+    phone_number: '',
+    email: '',
+    address: ''
   });
 
-  const [medications, setMedications] = useState([
+  const [medications, setMedications] = useState<Medication[]>([
     { id: 1, name: '', dose: '', frequency: '' }
   ]);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [signature, setSignature] = useState('');
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -177,13 +239,13 @@ export default function AIGPGxIntakeForm() {
     setMedications([...medications, { id: newId, name: '', dose: '', frequency: '' }]);
   };
 
-  const removeMedication = (id) => {
+  const removeMedication = (id: number) => {
     if (medications.length > 1) {
       setMedications(medications.filter(med => med.id !== id));
     }
   };
 
-  const updateMedication = (id, field, value) => {
+  const updateMedication = (id: number, field: keyof Medication, value: string | number) => {
     setMedications(medications.map(med =>
       med.id === id ? { ...med, [field]: value } : med
     ));
@@ -200,18 +262,17 @@ export default function AIGPGxIntakeForm() {
       const username = localStorage.getItem('username');
       const updatedFormData = { ...formData, username: username || '' };
 
-     const response = await axios.post(
-      `${API_BASE_URL}/submit_aig_pgx_consent`,
-      { updatedFormData, medications, signature },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      }
-    );
+      const response = await axios.post(
+        `${API_BASE_URL}/submit_aig_pgx_consent`,
+        { updatedFormData, medications, signature },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
 
-      // Axios uses numeric status codes; check for a 2xx response instead of `response.ok`
       if (response.status >= 200 && response.status < 300) {
         alert('Consent form submitted successfully!');
       } else {
@@ -351,8 +412,8 @@ export default function AIGPGxIntakeForm() {
                       placeholder="Enter phone number"
                       required
                     />
-
                   </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Email Address *
@@ -367,13 +428,14 @@ export default function AIGPGxIntakeForm() {
                       required
                     />
                   </div>
-                  <div>
+
+                  <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Residential Address *
                     </label>
                     <textarea
                       name="address"
-                      cols={12}
+                      rows={3}
                       value={formData.address}
                       onChange={handleInputChange}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -391,6 +453,7 @@ export default function AIGPGxIntakeForm() {
                     Current and Past Medications
                   </h2>
                   <button
+                    type="button"
                     onClick={addMedication}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                   >
@@ -422,7 +485,7 @@ export default function AIGPGxIntakeForm() {
                           </td>
                           <td className="border border-gray-300 px-2 py-2">
                             <MedicationAutocomplete
-                              value={med.name}
+                              value={med.name || ''}
                               onChange={(value) => updateMedication(med.id, 'name', value)}
                               placeholder="Type medication name..."
                             />
@@ -430,7 +493,7 @@ export default function AIGPGxIntakeForm() {
                           <td className="border border-gray-300 px-2 py-2">
                             <input
                               type="text"
-                              value={med.dose}
+                              value={med.dose || ''}
                               onChange={(e) => updateMedication(med.id, 'dose', e.target.value)}
                               className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded"
                               placeholder="e.g., 500mg"
@@ -439,7 +502,7 @@ export default function AIGPGxIntakeForm() {
                           <td className="border border-gray-300 px-2 py-2">
                             <input
                               type="text"
-                              value={med.frequency}
+                              value={med.frequency || ''}
                               onChange={(e) => updateMedication(med.id, 'frequency', e.target.value)}
                               className="w-full px-2 py-1 border-0 focus:ring-2 focus:ring-indigo-500 rounded"
                               placeholder="e.g., OD, BD"
@@ -447,6 +510,7 @@ export default function AIGPGxIntakeForm() {
                           </td>
                           <td className="border border-gray-300 px-2 py-2 text-center">
                             <button
+                              type="button"
                               onClick={() => removeMedication(med.id)}
                               className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               disabled={medications.length === 1}
@@ -561,6 +625,7 @@ export default function AIGPGxIntakeForm() {
         {/* Navigation Buttons */}
         <div className="bg-white rounded-b-xl shadow-lg p-6 flex justify-between items-center border-t border-gray-200">
           <button
+            type="button"
             onClick={() => setCurrentPage(1)}
             disabled={currentPage === 1}
             className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -570,6 +635,7 @@ export default function AIGPGxIntakeForm() {
 
           {currentPage === 1 ? (
             <button
+              type="button"
               onClick={() => setCurrentPage(2)}
               className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
             >
@@ -577,6 +643,7 @@ export default function AIGPGxIntakeForm() {
             </button>
           ) : (
             <button
+              type="button"
               onClick={handleSubmit}
               className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
             >
