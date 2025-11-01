@@ -77,7 +77,6 @@ export default function PGxIntakeForm() {
   }
 };
 
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 mt-12 p-4 md:p-8">
       <Navbar />
