@@ -13,6 +13,21 @@ export default function PGxIntakeForm() {
     allergies: 'None',
     username: ''
   });
+const resetForm = () => {
+  setFormData({
+    patient_name: '',
+    date: new Date().toISOString().split('T')[0],
+    date_of_birth: '',
+    gender: '',
+    guardian_name: '',
+    age: '',
+    allergies: 'None',
+    username: ''
+  });
+  setMedications([{ id: 1, name: '', dose: '', frequency: '' }]);
+  setSignature('');
+  setCurrentPage(1);
+};
 
 
   const [medications, setMedications] = useState([
@@ -46,6 +61,7 @@ export default function PGxIntakeForm() {
 
   const handleSubmit = async () => {
   console.log('Submitting form data:', formData);
+
   if (!signature) {
     alert('Please provide your signature before submitting');
     return;
@@ -56,7 +72,6 @@ export default function PGxIntakeForm() {
     const token = localStorage.getItem('token');
     const username = localStorage.getItem('username');
     const updatedFormData = { ...formData, username: username || '' };
-
 
     const response = await axios.post(
       `${API_BASE_URL}/submit_pgx_consent`,
@@ -71,11 +86,19 @@ export default function PGxIntakeForm() {
 
     console.log('Response:', response.data);
     alert('Consent form submitted successfully!');
+
+    // ✅ Show another form option after submission
+    const confirmNew = window.confirm('Do you want to submit another form?');
+    if (confirmNew) {
+      resetForm();
+    }
+
   } catch (error) {
     console.error('Error submitting consent:', error);
     alert('Failed to submit consent form. Please try again.');
   }
 };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 mt-12 p-4 md:p-8">
