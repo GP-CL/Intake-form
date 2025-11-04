@@ -25,6 +25,7 @@ interface FormData {
   phone_number: string;
   email: string;
   address: string;
+  created_by:string;
 }
 
 interface MedicationSuggestion {
@@ -115,6 +116,10 @@ function MedicationAutocomplete({ value, onChange, placeholder }: MedicationAuto
 
     try {
       const token = localStorage.getItem('token');
+      const username = localStorage.getItem('username');
+      const updatedFormData = { ...formData, username: username || '' };
+
+
       const response = await fetch(
         `${API_BASE_URL}/search_medications/${encodeURIComponent(query)}`,
         {
@@ -219,7 +224,8 @@ export default function AIGPGxIntakeForm() {
     username: '',
     phone_number: '',
     email: '',
-    address: ''
+    address: '',
+    created_by:''
   });
 
   const [medications, setMedications] = useState<Medication[]>([
