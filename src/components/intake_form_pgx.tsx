@@ -11,7 +11,9 @@ export default function PGxIntakeForm() {
     guardian_name: '',
     age: '',
     allergies: 'None',
-    username: ''
+    username: '',
+    email:'',
+    phone_number:''
   });
 const resetForm = () => {
   setFormData({
@@ -22,7 +24,9 @@ const resetForm = () => {
     guardian_name: '',
     age: '',
     allergies: 'None',
-    username: ''
+    username: '',
+    email:'',
+    phone_number:''
   });
   setMedications([{ id: 1, name: '', dose: '', frequency: '' }]);
   setSignature('');
@@ -215,6 +219,34 @@ const resetForm = () => {
                       onChange={handleInputChange}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       placeholder="Age in years"
+                      required
+                    />
+                  </div>
+                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="Enter your email"
+                      required
+                    />
+                  </div>
+                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone Number *
+                    </label>
+                    <input
+                      type="text"
+                      name="phone_number"
+                      value={formData.phone_number}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="Enter your Phone Number"
                       required
                     />
                   </div>
