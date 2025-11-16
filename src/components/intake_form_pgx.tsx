@@ -76,6 +76,8 @@ const resetForm = () => {
     const token = localStorage.getItem('token');
     const username = localStorage.getItem('username');
     const updatedFormData = { ...formData, username: username || '' };
+    console.log('Submitting form data:', formData);
+
 
     const response = await axios.post(
       `${API_BASE_URL}/submit_pgx_consent`,
@@ -458,4 +460,5 @@ const resetForm = () => {
       </div>
     </div>
   );
+
 }
