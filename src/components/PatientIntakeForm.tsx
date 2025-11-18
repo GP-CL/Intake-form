@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, Phone, Mail, MessageSquare, Calendar, Users, CheckCircle, Loader2, ChevronLeft, ChevronRight, FileText, Heart, TestTube } from 'lucide-react';
 import { ChevronDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import axios from "axios";
 import Navbar from './navbar';
 export type Patient = {
@@ -42,6 +43,7 @@ export type Patient = {
     condition: string;
     has_condition: boolean;
     family_members: string[];
+    cancer_type?: string; // For cancer condition
   }>;
   consanguineous_marriage: boolean;
 
@@ -96,6 +98,7 @@ export type Patient = {
 };
 
 const PatientIntakeForm: React.FC = () => {
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
   const [formData, setFormData] = useState<Patient>({
     // Page 1 - Basic Info
@@ -191,6 +194,7 @@ const PatientIntakeForm: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [signature, setSignature] = useState('');
   const reviewOfSystems = {
     'Constitutional': [
       'Lack of Energy',
@@ -321,6 +325,30 @@ const PatientIntakeForm: React.FC = () => {
     'Sudden Death', 'High Blood Pressure', 'Cerebrovascular Accident', 'Diabetes', 'Seizures',
     'Mental Illness', 'Cancer', 'Hearing/Speech Problems', 'Alcohol Abuse', 'Thyroid Disease',
     'Liver Cirrhosis', 'Rheumatoid Arthritis', 'Connective Tissue Diseases'
+  ];
+
+  const cancerTypes = [
+    'Lung Cancer',
+    'Breast Cancer',
+    'Prostate Cancer',
+    'Colorectal Cancer',
+    'Skin Cancer (Melanoma)',
+    'Skin Cancer (Non-Melanoma)',
+    'Leukemia',
+    'Lymphoma',
+    'Pancreatic Cancer',
+    'Liver Cancer',
+    'Kidney Cancer',
+    'Bladder Cancer',
+    'Thyroid Cancer',
+    'Ovarian Cancer',
+    'Cervical Cancer',
+    'Uterine Cancer',
+    'Stomach Cancer',
+    'Esophageal Cancer',
+    'Brain Cancer',
+    'Oral Cancer',
+    'Other Cancer'
   ];
 
   const Mental_History = [
@@ -687,6 +715,32 @@ const PatientIntakeForm: React.FC = () => {
     return item ? item.family_members.includes(member) : false;
   };
 
+  const handleCancerTypeChange = (member: string, cancerType: string) => {
+    setFormData(prev => {
+      const cancerConditionIndex = prev.family_history.findIndex(item => item.condition === 'Cancer');
+      
+      if (cancerConditionIndex >= 0) {
+        const updatedHistory = [...prev.family_history];
+        updatedHistory[cancerConditionIndex] = {
+          ...updatedHistory[cancerConditionIndex],
+          cancer_type: cancerType
+        };
+        
+        return {
+          ...prev,
+          family_history: updatedHistory
+        };
+      }
+      
+      return prev;
+    });
+  };
+
+  const getCancerType = () => {
+    const cancerItem = formData.family_history.find(item => item.condition === 'Cancer');
+    return cancerItem?.cancer_type || '';
+  };
+
   const validateCurrentPage = () => {
     switch (currentPage) {
       case 1:
@@ -724,7 +778,7 @@ const PatientIntakeForm: React.FC = () => {
       return;
     }
     setSubmitStatus('idle');
-    setCurrentPage(prev => Math.min(prev + 1, 8));
+    setCurrentPage(prev => Math.min(prev + 1, 9));
   };
 
   const prevPage = () => {
@@ -967,13 +1021,39 @@ const PatientIntakeForm: React.FC = () => {
     );
   }
 
-  const pageIcons = [FileText, MessageSquare, Heart, FileText, Users, TestTube, Heart, FileText];
+  const pageIcons = [FileText, MessageSquare, Heart, FileText, Users, TestTube, Heart, FileText, CheckCircle];
   const PageIcon = pageIcons[currentPage - 1];
 
   return (
-    <div className="max-w-7xl mx-auto p-8">
+    <div className="p-8">
       <Navbar/>
-      <div className="bg-white rounded-2xl shadow-xl overflow-hidden mt-10">
+      {/* Spacer for fixed navbar */}
+      <div className="h-20 lg:h-24"></div>
+      
+      <div className="max-w-7xl mx-auto md:flex md:items-start gap-6">
+      {/* Fixed desktop back button */}
+      <div className="hidden md:block fixed left-4 top-28 w-28 z-40">
+        <button
+          className="w-full flex items-center justify-center gap-1 px-3 py-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-md font-medium transition-colors text-sm"
+          onClick={() => navigate(-1)}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.25" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+          Back
+        </button>
+      </div>
+      {/* Mobile back button */}
+      <div className="md:hidden mb-4">
+        <button
+          className="flex items-center gap-1 px-4 py-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-md shadow-md font-medium transition-colors text-sm"
+          onClick={() => navigate(-1)}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.25" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+          Back
+        </button>
+      </div>
+      
+      <div className="flex-1">
+      <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
         {/* Header with progress */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-8 text-white">
           <div className="flex items-center justify-between mb-4">
@@ -982,13 +1062,13 @@ const PatientIntakeForm: React.FC = () => {
               <h1 className="text-3xl font-bold">Patient Intake Form - GenepoweRx</h1>
             </div>
             <div className="text-blue-100">
-              Page {currentPage} of 8
+              Page {currentPage} of 9
             </div>
           </div>
           <div className="w-full bg-blue-800 rounded-full h-2">
             <div
               className="bg-white h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(currentPage / 8) * 100}%` }}
+              style={{ width: `${(currentPage / 9) * 100}%` }}
             />
           </div>
         </div>
@@ -1462,34 +1542,59 @@ const PatientIntakeForm: React.FC = () => {
                     <tbody>
                       {familyConditions.map((condition, index) => {
                         const hasCondition = isFamilyConditionSelected(condition);
+                        const isCancer = condition === 'Cancer';
                         return (
-                          <tr key={condition} className={`border-t ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                            <td className="px-4 py-3 text-sm text-gray-800 border-r border-gray-200 font-medium">
-                              {condition}
-                            </td>
-                            <td className="px-4 py-3 text-center border-r border-gray-200">
-                              <input
-                                type="checkbox"
-                                checked={hasCondition}
-                                onChange={() => handleFamilyConditionToggle(condition)}
-                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                              />
-                            </td>
-                            {['Father', 'Mother', 'Sibling', 'Other'].map((member) => (
-                              <td key={member} className="px-4 py-3 text-center border-r border-gray-200 last:border-r-0">
-                                <input
-                                  type="checkbox"
-                                  checked={isFamilyMemberSelected(condition, member)}
-                                  onChange={() => handleFamilyMemberToggle(condition, member)}
-                                  disabled={!hasCondition}
-                                  className={`w-4 h-4 rounded border-gray-300 focus:ring-blue-500 ${hasCondition
-                                    ? 'text-blue-600'
-                                    : 'text-gray-300 cursor-not-allowed opacity-50'
-                                    }`}
-                                />
+                          <React.Fragment key={condition}>
+                            <tr className={`border-t ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                              <td className="px-4 py-3 text-sm text-gray-800 border-r border-gray-200 font-medium">
+                                {condition}
                               </td>
-                            ))}
-                          </tr>
+                              <td className="px-4 py-3 border-r border-gray-200">
+                                <div className="flex flex-col items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={hasCondition}
+                                    onChange={() => handleFamilyConditionToggle(condition)}
+                                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  {isCancer && hasCondition && (
+                                    <input
+                                      type="text"
+                                      value={getCancerType()}
+                                      onChange={(e) => handleCancerTypeChange('', e.target.value)}
+                                      placeholder="Cancer type"
+                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                  )}
+                                </div>
+                              </td>
+                              {['Father', 'Mother', 'Sibling', 'Other'].map((member) => (
+                                <td key={member} className="px-4 py-3 border-r border-gray-200 last:border-r-0">
+                                  <div className="flex flex-col items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={isFamilyMemberSelected(condition, member)}
+                                      onChange={() => handleFamilyMemberToggle(condition, member)}
+                                      disabled={!hasCondition}
+                                      className={`w-4 h-4 rounded border-gray-300 focus:ring-blue-500 ${hasCondition
+                                        ? 'text-blue-600'
+                                        : 'text-gray-300 cursor-not-allowed opacity-50'
+                                        }`}
+                                    />
+                                    {isCancer && hasCondition && isFamilyMemberSelected(condition, member) && (
+                                      <input
+                                        type="text"
+                                        value={getCancerType()}
+                                        onChange={(e) => handleCancerTypeChange(member, e.target.value)}
+                                        placeholder="Cancer type"
+                                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                      />
+                                    )}
+                                  </div>
+                                </td>
+                              ))}
+                            </tr>
+                          </React.Fragment>
                         );
                       })}
 
@@ -2157,7 +2262,7 @@ const PatientIntakeForm: React.FC = () => {
           )}
           {currentPage === 8 && (
             <div className="space-y-6">
-              <h2 className="text-xl font-semibold"> Observation Chart</h2>
+              <h2 className="text-xl font-semibold"> DetObservation Chart</h2>
 
               <table className="w-full border border-gray-300">
                 <thead>
@@ -2253,6 +2358,51 @@ const PatientIntakeForm: React.FC = () => {
             </div>
           )}
 
+          {currentPage === 9 && (
+            <div className="space-y-6">
+              {/* Consent Terms */}
+              <div className="mb-8 space-y-4 text-sm text-gray-700 leading-relaxed">
+                <p className="font-medium text-gray-800">
+                  I, <span className="font-semibold text-indigo-600">{formData.full_name || '_____________'}</span> (Patient's name) aged <span className="font-semibold text-indigo-600">{formData.age || '___'}</span>, hereby give my consent to GenepowerRx Personalized Medicine Clinic Private Limited ("Clinic") to conduct genomics tests and analysis ("Services/Test") as recommended by my healthcare provider.
+                </p>
+
+                <div className="space-y-3 pl-4">
+                  <p><strong>1.</strong> The medical practitioner/ physician has fully and clearly explained the outcomes, benefits and limitations of the whole exome sequencing. I hereby agree that I have had an opportunity to discuss and clarify the risks and other concerns with the medical practitioner. I hereby give my free consent to the Clinic to conduct the Test on the sample provided by me.</p>
+                  <p><strong>2.</strong> I shall provide accurate medical and personal information about my age, medical history, health concerns, symptoms, dietary habits, allergies, medications, lifestyle habits, family history and/or any other details /questions that enables the Clinic to conduct and interpret the results of the tests effectively. I, therefore, confirm and declare that all the information and materials provided by me are true, accurate and complete to the best of my knowledge.</p>
+                  <p><strong>3.</strong> I, shall not hold the Clinic responsible or liable for the interpretation or analysis of the tests conducted by the Clinic solely based on the medical information provided by me.</p>
+                  <p><strong>4.</strong> I understand that though genomics testing provides generally accurate results, several sources of errors are possible including but not limited to the possibility of a failure or error in sample analysis, as with the case of any genomics tests. I understand that genomics tests are relatively new and are being improved and expanded continuously. Hence, due to current limitations in technology and incomplete knowledge and information on genes and diseases, there is a possibility that the test results may be inconclusive, uninterpretable or of unknown significance which may require further testing.</p>
+                  <p><strong>5.</strong> I hereby understand that the results/outcome of the tests conducted by the Clinic is indicative and cannot be perceived as conclusive or guaranteed. I also understand that the Test reports may provide information not anticipated and unrelated to my reported clinical symptoms, but can be of medical value for patient care. I understand that the results of my tests are not be read in isolation and further clinical correlation may be required.</p>
+                  <p><strong>6.</strong> I understand that the Clinic is not a specimen banking facility and therefore the blood sample shall be discarded after 2(two) months and shall not be available for future clinical tests. However, the DNA will be stored at both AIG and GenepoweRx for further analysis if needed.</p>
+                  <p><strong>7.</strong> I understand that the report and any record of my personal data including but not limited to my name, age, address, symptoms, descriptions, Test reports etc. in the possession of the Clinic is in safe custody and in an encrypted form and I hereby provide my consent to the Clinic to store my personal data and information for medical research purpose.</p>
+                  <p><strong>8.</strong> I further consent and authorize to the collection, processing, use, storage and retention of the anonymized data, the sample collected and related anonymized reports from the tests conducted for ongoing test developments, educational, scientific research and/or other related activities. I understand that analytics will be done only for this study with this particular sample. I understand that the Clinic has taken the appropriate measures to maintain confidentiality. I hereby understand that this is purely for the purpose mentioned hereinbefore and my identity shall not be revealed in any manner whatsoever.</p>
+                  <p><strong>9.</strong> I understand that I have to visit the hospital thrice over a period of six months starting from the enrollment in the study as instructed by the physicians.</p>
+                  <p><strong>10.</strong> I understand that the clinic shall not disclose or hand-over the results of the tests to anyone else other than me, unless until required by law or expressly authorized by me.</p>
+                  <p><strong>11.</strong> I herein agree that a copy of this consent form is retained by me for any future use that may arise.</p>
+                </div>
+              </div>
+
+              {/* Signature Section */}
+              <div className="border-t-2 border-gray-200 pt-6">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Signature of the Patient / Guardian (in case of a minor) *
+                </label>
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    value={signature}
+                    onChange={(e) => setSignature(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-cursive text-2xl"
+                    placeholder="Type your full name as signature"
+                    required
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mb-4">
+                  By typing your name above, you agree that this constitutes your legal signature
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Navigation */}
           <div className="flex items-center justify-between pt-8 border-t border-gray-200">
             <button
@@ -2268,7 +2418,7 @@ const PatientIntakeForm: React.FC = () => {
             </button>
 
             <div className="flex space-x-2">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((page) => (
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((page) => (
                 <div
                   key={page}
                   className={`w-3 h-3 rounded-full ${page === currentPage ? 'bg-blue-600' : 'bg-gray-300'
@@ -2277,7 +2427,7 @@ const PatientIntakeForm: React.FC = () => {
               ))}
             </div>
 
-            {currentPage < 8 ? (
+            {currentPage < 9 ? (
               <button
                 onClick={nextPage}
                 className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
@@ -2303,6 +2453,8 @@ const PatientIntakeForm: React.FC = () => {
             )}
           </div>
         </div>
+      </div>
+      </div>
       </div>
     </div >
   );
