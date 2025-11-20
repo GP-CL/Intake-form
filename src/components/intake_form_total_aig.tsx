@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { User, Phone, Mail, MessageSquare, Calendar, Users, CheckCircle, Loader2, ChevronLeft, ChevronRight, FileText, Heart, TestTube } from 'lucide-react';
 import { ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import axios from "axios";
+// import axios from "axios";
 import AIG_Navbar from './navbar_aig';
 export type Patient = {
     // Page 1 - Basic Info
@@ -40,6 +40,7 @@ export type Patient = {
         family_members: string[];
         cancer_types?: { [key: string]: string }; // patient ("Patient") and/or Father/Mother/Sibling/Other
     }>;
+    family_history_notes?: string;
     //   consanguineous_marriage: boolean;
 
     //page 5- Mental Health History
@@ -55,7 +56,7 @@ export type Patient = {
         Frequency: string;
     }>;
     notes_medicines: string;
-    review_of_systems: { [system: string]: string[] };
+    review_of_systems: { [system: string]: { [item: string]: { selected: boolean; notes: string } } };
     expandedSystems: { [key: string]: boolean };
 
 
@@ -130,6 +131,7 @@ const PatientIntakeFormAIG: React.FC = () => {
 
         // Page 4 - Family History
         family_history: [],
+        family_history_notes: '',
         // consanguineous_marriage: false,
 
         // Page 5 - Mental Health History
@@ -308,13 +310,13 @@ const PatientIntakeFormAIG: React.FC = () => {
 
     ]
     interface QuestionOption {
-        id: string;
+        id: keyof Patient;
         question: string;
         type: 'radio' | 'text' | 'checkbox';
         options?: string[];
         placeholder?: string;
         hasOtherField?: boolean;
-        otherFieldId?: string;
+        otherFieldId?: keyof Patient;
         otherPlaceholder?: string;
     }
 
@@ -331,7 +333,7 @@ const PatientIntakeFormAIG: React.FC = () => {
             options: ['Yes', 'Previous Drinker', 'Never']
         },
         {
-            id:"alcohol_frequency",
+            id: 'alchohol_frequency',
             question: 'If Yes, How Many Drink Per Week?',
             type: 'radio',
             options: ['1','2','3','More than 3']
@@ -455,7 +457,7 @@ const PatientIntakeFormAIG: React.FC = () => {
 
 
     const TableRow: React.FC<TableRowProps> = ({ item, formData, setFormData, handleArrayToggle }) => {
-        const { id, question, type, options, placeholder, hasOtherField, otherFieldId, otherPlaceholder } = item;
+        const { id, question, type, options, hasOtherField, otherFieldId, otherPlaceholder } = item;
 
         if (type === 'text') {
             return (
@@ -573,24 +575,74 @@ const PatientIntakeFormAIG: React.FC = () => {
 
     const toggleCondition = (system: string, condition: string) => {
         setFormData(prev => {
-            const current = prev.review_of_systems[system] || [];
+            const currentSystem = prev.review_of_systems[system] || {};
+            const currentItem = currentSystem[condition];
+            const isCurrentlySelected = currentItem?.selected || false;
 
-            let updated: string[];
-            if (current.includes(condition)) {
-                // Remove
-                updated = current.filter(c => c !== condition);
+            if (isCurrentlySelected) {
+                // Remove the item completely when unchecking
+                const { [condition]: removed, ...remainingItems } = currentSystem;
+                const updatedSystem = Object.keys(remainingItems).length > 0 ? remainingItems : {};
+                
+                if (Object.keys(updatedSystem).length === 0) {
+                    // Remove the entire system if no items left
+                    const { [system]: removedSystem, ...remainingSystems } = prev.review_of_systems;
+                    return {
+                        ...prev,
+                        review_of_systems: remainingSystems
+                    };
+                } else {
+                    return {
+                        ...prev,
+                        review_of_systems: {
+                            ...prev.review_of_systems,
+                            [system]: updatedSystem
+                        }
+                    };
+                }
             } else {
-                // Add
-                updated = [...current, condition];
+                // Add the item with selected: true and empty notes when checking
+                return {
+                    ...prev,
+                    review_of_systems: {
+                        ...prev.review_of_systems,
+                        [system]: {
+                            ...currentSystem,
+                            [condition]: {
+                                selected: true,
+                                notes: currentItem?.notes || ''
+                            }
+                        }
+                    }
+                };
+            }
+        });
+    };
+
+    const updateConditionNotes = (system: string, condition: string, notes: string) => {
+        setFormData(prev => {
+            const currentSystem = prev.review_of_systems[system] || {};
+            const currentItem = currentSystem[condition];
+
+            // Only update notes if the item exists and is selected
+            if (currentItem && currentItem.selected) {
+                return {
+                    ...prev,
+                    review_of_systems: {
+                        ...prev.review_of_systems,
+                        [system]: {
+                            ...currentSystem,
+                            [condition]: {
+                                ...currentItem,
+                                notes: notes
+                            }
+                        }
+                    }
+                };
             }
 
-            return {
-                ...prev,
-                review_of_systems: {
-                    ...prev.review_of_systems,
-                    [system]: updated
-                }
-            };
+            // If item doesn't exist or isn't selected, don't update anything
+            return prev;
         });
     };
 
@@ -709,27 +761,27 @@ const PatientIntakeFormAIG: React.FC = () => {
         setSubmitStatus('idle');
 
         try {
-            const API_BASE_URL = "https://di5esbfx1i.execute-api.ap-south-1.amazonaws.com/api";
+            console.log('Form Data to be submitted:', formData);
+            //const API_BASE_URL = "https://di5esbfx1i.execute-api.ap-south-1.amazonaws.com/api";
 
-            const token = localStorage.getItem('token'); // ✅ get logged-in user token
-            const username = localStorage.getItem('username');
-            formData.username = username || '';
-            const response = await axios.post(    // send formData as the request body and pass headers as the third argument (config)
+        //     const token = localStorage.getItem('token'); // ✅ get logged-in user token
+        //     const username = localStorage.getItem('username');
+        //     formData.username = username || '';
+        //     const response = await axios.post(    // send formData as the request body
+        //         `${API_BASE_URL}/submit_form_aig`,
+        //         formData,
+        //         {
+        //             headers: {
+        //                 'Content-Type': 'application/json',
+        //                 'Authorization': `Bearer ${token}`
+        //             }
+        //         }
+        //     );
 
-                `${API_BASE_URL}/submit_form_aig`,
-                formData,
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    }
-                }
-            );
-
-            // Axios throws on non-2xx responses by default, but check status for extra safety
-            if (response.status < 200 || response.status >= 300) {
-                throw new Error('Failed to submit form');
-            }
+        //     // Axios throws on non-2xx responses by default, but check status for extra safety
+        //     if (response.status < 200 || response.status >= 300) {
+        //         throw new Error('Failed to submit form');
+        //     }
 
             setSubmitStatus('success');
         } catch (error) {
@@ -1373,15 +1425,6 @@ const PatientIntakeFormAIG: React.FC = () => {
                                                                         : 'text-gray-300 cursor-not-allowed opacity-50'
                                                                         }`}
                                                                 />
-                                                                {condition === 'Cancer' && hasCondition && isFamilyMemberSelected('Cancer', member) && (
-                                                                    <input
-                                                                        type="text"
-                                                                        placeholder={`${member} cancer type`}
-                                                                        className="mt-2 w-full px-2 py-1 text-xs border rounded"
-                                                                        value={formData.family_history.find(f=>f.condition==='Cancer')?.cancer_types?.[member] || ''}
-                                                                        onChange={e=>handleCancerTypeChange(member, e.target.value)}
-                                                                    />
-                                                                )}
                                                             </td>
                                                         ))}
                                                     </tr>
@@ -1490,6 +1533,23 @@ const PatientIntakeFormAIG: React.FC = () => {
                                         <strong>Instructions:</strong> First check "Has Condition" if any family member has the condition,
                                         then select which specific family members are affected. For "Other Condition", please specify the condition name.
                                     </p>
+                                </div>
+
+                                {/* Family History Notes Section */}
+                                <div className="mt-6">
+                                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                                        Additional Notes about Family History
+                                    </label>
+                                    <textarea
+                                        value={formData.family_history_notes || ''}
+                                        onChange={(e) => setFormData(prev => ({
+                                            ...prev,
+                                            family_history_notes: e.target.value
+                                        }))}
+                                        rows={4}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical"
+                                        placeholder="Please provide any additional information about your family medical history, including ages at diagnosis, outcomes, or other relevant details..."
+                                    />
                                 </div>
                             </div>
 
@@ -1805,17 +1865,34 @@ const PatientIntakeFormAIG: React.FC = () => {
                                             </h3>
                                             {formData.expandedSystems?.[category] && (
                                                 <div className="space-y-2 ml-4">
-                                                    {items.map((item) => (
-                                                        <label key={item} className="flex items-center gap-2">
-                                                            <input
-                                                                type="checkbox"
-                                                                className='w-4 h-4'
-                                                                checked={formData.review_of_systems[category]?.includes(item) || false}
-                                                                onChange={() => toggleCondition(category, item)}
-                                                            />
-                                                            <span className="text-sm">{item}</span>
-                                                        </label>
-                                                    ))}
+                                                    {items.map((item) => {
+                                                        const itemData = formData.review_of_systems[category]?.[item] || { selected: false, notes: '' };
+                                                        const isChecked = itemData.selected;
+                                                        return (
+                                                            <div key={item} className="space-y-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className='w-4 h-4 flex-shrink-0'
+                                                                        checked={isChecked}
+                                                                        onChange={() => toggleCondition(category, item)}
+                                                                    />
+                                                                    <span className="text-sm">{item}</span>
+                                                                </div>
+                                                                {isChecked && (
+                                                                    <div className="ml-6">
+                                                                        <input
+                                                                            type="text"
+                                                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                                            placeholder="Additional notes..."
+                                                                            value={itemData.notes}
+                                                                            onChange={(e) => updateConditionNotes(category, item, e.target.value)}
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
                                         </div>
@@ -1844,18 +1921,34 @@ const PatientIntakeFormAIG: React.FC = () => {
                                             </h3>
                                             {formData.expandedSystems?.[category] && (
                                                 <div className="space-y-2 ml-4">
-                                                    {items.map((item) => (
-                                                        <label key={item} className="flex items-center gap-2">
-                                                            <input
-                                                                type="checkbox"
-                                                                className='w-4 h-4'
-                                                                checked={formData.review_of_systems[category]?.includes(item) || false}
-                                                                onChange={() => toggleCondition(category, item)}
-
-                                                            />
-                                                            <span className="text-sm">{item}</span>
-                                                        </label>
-                                                    ))}
+                                                    {items.map((item) => {
+                                                        const itemData = formData.review_of_systems[category]?.[item] || { selected: false, notes: '' };
+                                                        const isChecked = itemData.selected;
+                                                        return (
+                                                            <div key={item} className="space-y-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className='w-4 h-4 flex-shrink-0'
+                                                                        checked={isChecked}
+                                                                        onChange={() => toggleCondition(category, item)}
+                                                                    />
+                                                                    <span className="text-sm">{item}</span>
+                                                                </div>
+                                                                {isChecked && (
+                                                                    <div className="ml-6">
+                                                                        <input
+                                                                            type="text"
+                                                                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                                            placeholder="Additional notes..."
+                                                                            value={itemData.notes}
+                                                                            onChange={(e) => updateConditionNotes(category, item, e.target.value)}
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
                                         </div>
@@ -1952,13 +2045,13 @@ const PatientIntakeFormAIG: React.FC = () => {
                                 <h2 className="text-lg font-semibold mb-4">Physical Examination</h2>
                                 <table className="w-full border-collapse border border-gray-300">
                                     <tbody>
-                                        {[
-                                            { label: 'Blood Pressure', id: 'blood_pressure' },
-                                            { label: 'Pulse Rate', id: 'pulse_rate' },
-                                            { label: 'Height', id: 'height' },
-                                            { label: 'Weight', id: 'weight' },
-                                            { label: 'BMI', id: 'BMI' },
-                                        ].map(({ label, id }) => (
+                                        {([
+                                            { label: 'Blood Pressure', id: 'blood_pressure' as keyof Patient },
+                                            { label: 'Pulse Rate', id: 'pulse_rate' as keyof Patient },
+                                            { label: 'Height', id: 'height' as keyof Patient },
+                                            { label: 'Weight', id: 'weight' as keyof Patient },
+                                            { label: 'BMI', id: 'BMI' as keyof Patient },
+                                        ] as const).map(({ label, id }) => (
                                             <tr key={id} className="border-b border-gray-200">
                                                 <td className="p-3 font-medium bg-gray-50 border-r border-gray-200 w-1/3">{label}:</td>
                                                 <td className="p-3">

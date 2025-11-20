@@ -44,7 +44,9 @@ export type Patient = {
     has_condition: boolean;
     family_members: string[];
     cancer_type?: string; // For cancer condition
+
   }>;
+  family_history_notes?: string;
   consanguineous_marriage: boolean;
 
   //page 5- Mental Health History
@@ -60,7 +62,7 @@ export type Patient = {
     Frequency: string;
   }>;
   notes_medicines: string;
-  review_of_systems: { [system: string]: string[] };
+  review_of_systems: { [system: string]: { [item: string]: { selected: boolean; notes: string } } };
   expandedSystems: { [key: string]: boolean };
 
 
@@ -134,6 +136,7 @@ const PatientIntakeForm: React.FC = () => {
 
     // Page 4 - Family History
     family_history: [],
+    family_history_notes: '',
     consanguineous_marriage: false,
 
     // Page 5 - Mental Health History
@@ -327,29 +330,29 @@ const PatientIntakeForm: React.FC = () => {
     'Liver Cirrhosis', 'Rheumatoid Arthritis', 'Connective Tissue Diseases'
   ];
 
-  const cancerTypes = [
-    'Lung Cancer',
-    'Breast Cancer',
-    'Prostate Cancer',
-    'Colorectal Cancer',
-    'Skin Cancer (Melanoma)',
-    'Skin Cancer (Non-Melanoma)',
-    'Leukemia',
-    'Lymphoma',
-    'Pancreatic Cancer',
-    'Liver Cancer',
-    'Kidney Cancer',
-    'Bladder Cancer',
-    'Thyroid Cancer',
-    'Ovarian Cancer',
-    'Cervical Cancer',
-    'Uterine Cancer',
-    'Stomach Cancer',
-    'Esophageal Cancer',
-    'Brain Cancer',
-    'Oral Cancer',
-    'Other Cancer'
-  ];
+  // const cancerTypes = [
+  //   'Lung Cancer',
+  //   'Breast Cancer',
+  //   'Prostate Cancer',
+  //   'Colorectal Cancer',
+  //   'Skin Cancer (Melanoma)',
+  //   'Skin Cancer (Non-Melanoma)',
+  //   'Leukemia',
+  //   'Lymphoma',
+  //   'Pancreatic Cancer',
+  //   'Liver Cancer',
+  //   'Kidney Cancer',
+  //   'Bladder Cancer',
+  //   'Thyroid Cancer',
+  //   'Ovarian Cancer',
+  //   'Cervical Cancer',
+  //   'Uterine Cancer',
+  //   'Stomach Cancer',
+  //   'Esophageal Cancer',
+  //   'Brain Cancer',
+  //   'Oral Cancer',
+  //   'Other Cancer'
+  // ];
 
   const Mental_History = [
     'Do you face any difficulty concentrating on your work?',
@@ -364,13 +367,13 @@ const PatientIntakeForm: React.FC = () => {
 
   ]
   interface QuestionOption {
-    id: string;
+    id: keyof Patient;
     question: string;
     type: 'radio' | 'text' | 'checkbox';
     options?: string[];
     placeholder?: string;
     hasOtherField?: boolean;
-    otherFieldId?: string;
+    otherFieldId?: keyof Patient;
     otherPlaceholder?: string;
   }
 
@@ -499,7 +502,7 @@ const PatientIntakeForm: React.FC = () => {
 
 
   const TableRow: React.FC<TableRowProps> = ({ item, formData, setFormData, handleArrayToggle }) => {
-    const { id, question, type, options, placeholder, hasOtherField, otherFieldId, otherPlaceholder } = item;
+    const { id, question, type, options, hasOtherField, otherFieldId, otherPlaceholder } = item;
 
     if (type === 'text') {
       return (
@@ -617,24 +620,74 @@ const PatientIntakeForm: React.FC = () => {
 
   const toggleCondition = (system: string, condition: string) => {
     setFormData(prev => {
-      const current = prev.review_of_systems[system] || [];
+      const currentSystem = prev.review_of_systems[system] || {};
+      const currentItem = currentSystem[condition];
+      const isCurrentlySelected = currentItem?.selected || false;
 
-      let updated: string[];
-      if (current.includes(condition)) {
-        // Remove
-        updated = current.filter(c => c !== condition);
+      if (isCurrentlySelected) {
+        // Remove the item completely when unchecking
+        const { [condition]: removed, ...remainingItems } = currentSystem;
+        const updatedSystem = Object.keys(remainingItems).length > 0 ? remainingItems : {};
+        
+        if (Object.keys(updatedSystem).length === 0) {
+          // Remove the entire system if no items left
+          const { [system]: removedSystem, ...remainingSystems } = prev.review_of_systems;
+          return {
+            ...prev,
+            review_of_systems: remainingSystems
+          };
+        } else {
+          return {
+            ...prev,
+            review_of_systems: {
+              ...prev.review_of_systems,
+              [system]: updatedSystem
+            }
+          };
+        }
       } else {
-        // Add
-        updated = [...current, condition];
+        // Add the item with selected: true and empty notes when checking
+        return {
+          ...prev,
+          review_of_systems: {
+            ...prev.review_of_systems,
+            [system]: {
+              ...currentSystem,
+              [condition]: {
+                selected: true,
+                notes: currentItem?.notes || ''
+              }
+            }
+          }
+        };
+      }
+    });
+  };
+
+  const updateConditionNotes = (system: string, condition: string, notes: string) => {
+    setFormData(prev => {
+      const currentSystem = prev.review_of_systems[system] || {};
+      const currentItem = currentSystem[condition];
+
+      // Only update notes if the item exists and is selected
+      if (currentItem && currentItem.selected) {
+        return {
+          ...prev,
+          review_of_systems: {
+            ...prev.review_of_systems,
+            [system]: {
+              ...currentSystem,
+              [condition]: {
+                ...currentItem,
+                notes: notes
+              }
+            }
+          }
+        };
       }
 
-      return {
-        ...prev,
-        review_of_systems: {
-          ...prev.review_of_systems,
-          [system]: updated
-        }
-      };
+      // If item doesn't exist or isn't selected, don't update anything
+      return prev;
     });
   };
 
@@ -704,7 +757,11 @@ const PatientIntakeForm: React.FC = () => {
       } else {
         return {
           ...prev,
-          family_history: [...prev.family_history, { condition, family_members: [member] }]
+          family_history: [...prev.family_history, { 
+            condition, 
+            has_condition: true,
+            family_members: [member] 
+          }]
         };
       }
     });
@@ -715,7 +772,7 @@ const PatientIntakeForm: React.FC = () => {
     return item ? item.family_members.includes(member) : false;
   };
 
-  const handleCancerTypeChange = (member: string, cancerType: string) => {
+  const handleCancerTypeChange = (_member: string, cancerType: string) => {
     setFormData(prev => {
       const cancerConditionIndex = prev.family_history.findIndex(item => item.condition === 'Cancer');
       
@@ -1570,7 +1627,7 @@ const PatientIntakeForm: React.FC = () => {
                               </td>
                               {['Father', 'Mother', 'Sibling', 'Other'].map((member) => (
                                 <td key={member} className="px-4 py-3 border-r border-gray-200 last:border-r-0">
-                                  <div className="flex flex-col items-center gap-2">
+                                  <div className="flex justify-center">
                                     <input
                                       type="checkbox"
                                       checked={isFamilyMemberSelected(condition, member)}
@@ -1581,15 +1638,6 @@ const PatientIntakeForm: React.FC = () => {
                                         : 'text-gray-300 cursor-not-allowed opacity-50'
                                         }`}
                                     />
-                                    {isCancer && hasCondition && isFamilyMemberSelected(condition, member) && (
-                                      <input
-                                        type="text"
-                                        value={getCancerType()}
-                                        onChange={(e) => handleCancerTypeChange(member, e.target.value)}
-                                        placeholder="Cancer type"
-                                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      />
-                                    )}
                                   </div>
                                 </td>
                               ))}
@@ -1700,6 +1748,23 @@ const PatientIntakeForm: React.FC = () => {
                     <strong>Instructions:</strong> First check "Has Condition" if any family member has the condition,
                     then select which specific family members are affected. For "Other Condition", please specify the condition name.
                   </p>
+                </div>
+
+                {/* Family History Notes Section */}
+                <div className="mt-6">
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    Additional Notes about Family History
+                  </label>
+                  <textarea
+                    value={formData.family_history_notes || ''}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      family_history_notes: e.target.value
+                    }))}
+                    rows={4}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical"
+                    placeholder="Please provide any additional information about your family medical history, including ages at diagnosis, outcomes, or other relevant details..."
+                  />
                 </div>
               </div>
 
@@ -2039,17 +2104,34 @@ const PatientIntakeForm: React.FC = () => {
                       </h3>
                       {formData.expandedSystems?.[category] && (
                         <div className="space-y-2 ml-4">
-                          {items.map((item) => (
-                            <label key={item} className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                className='w-4 h-4'
-                                checked={formData.review_of_systems[category]?.includes(item) || false}
-                                onChange={() => toggleCondition(category, item)}
-                              />
-                              <span className="text-sm">{item}</span>
-                            </label>
-                          ))}
+                          {items.map((item) => {
+                            const itemData = formData.review_of_systems[category]?.[item] || { selected: false, notes: '' };
+                            const isChecked = itemData.selected;
+                            return (
+                              <div key={item} className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    className='w-4 h-4 flex-shrink-0'
+                                    checked={isChecked}
+                                    onChange={() => toggleCondition(category, item)}
+                                  />
+                                  <span className="text-sm">{item}</span>
+                                </div>
+                                {isChecked && (
+                                  <div className="ml-6">
+                                    <input
+                                      type="text"
+                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                      placeholder="Additional notes..."
+                                      value={itemData.notes}
+                                      onChange={(e) => updateConditionNotes(category, item, e.target.value)}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -2078,18 +2160,34 @@ const PatientIntakeForm: React.FC = () => {
                       </h3>
                       {formData.expandedSystems?.[category] && (
                         <div className="space-y-2 ml-4">
-                          {items.map((item) => (
-                            <label key={item} className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                className='w-4 h-4'
-                                checked={formData.review_of_systems[category]?.includes(item) || false}
-                                onChange={() => toggleCondition(category, item)}
-
-                              />
-                              <span className="text-sm">{item}</span>
-                            </label>
-                          ))}
+                          {items.map((item) => {
+                            const itemData = formData.review_of_systems[category]?.[item] || { selected: false, notes: '' };
+                            const isChecked = itemData.selected;
+                            return (
+                              <div key={item} className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    className='w-4 h-4 flex-shrink-0'
+                                    checked={isChecked}
+                                    onChange={() => toggleCondition(category, item)}
+                                  />
+                                  <span className="text-sm">{item}</span>
+                                </div>
+                                {isChecked && (
+                                  <div className="ml-6">
+                                    <input
+                                      type="text"
+                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                      placeholder="Additional notes..."
+                                      value={itemData.notes}
+                                      onChange={(e) => updateConditionNotes(category, item, e.target.value)}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -2186,13 +2284,13 @@ const PatientIntakeForm: React.FC = () => {
                 <h2 className="text-lg font-semibold mb-4">Physical Examination</h2>
                 <table className="w-full border-collapse border border-gray-300">
                   <tbody>
-                    {[
-                      { label: 'Blood Pressure', id: 'blood_pressure' },
-                      { label: 'Pulse Rate', id: 'pulse_rate' },
-                      { label: 'Height', id: 'height' },
-                      { label: 'Weight', id: 'weight' },
-                      { label: 'BMI', id: 'BMI' },
-                    ].map(({ label, id }) => (
+                    {([
+                      { label: 'Blood Pressure', id: 'blood_pressure' as keyof Patient },
+                      { label: 'Pulse Rate', id: 'pulse_rate' as keyof Patient },
+                      { label: 'Height', id: 'height' as keyof Patient },
+                      { label: 'Weight', id: 'weight' as keyof Patient },
+                      { label: 'BMI', id: 'BMI' as keyof Patient },
+                    ] as const).map(({ label, id }) => (
                       <tr key={id} className="border-b border-gray-200">
                         <td className="p-3 font-medium bg-gray-50 border-r border-gray-200 w-1/3">{label}:</td>
                         <td className="p-3">
